@@ -6,7 +6,7 @@ import functools
 class ModuleHijacker:
     def __init__(self, module):
         self.__module = module
-        self.__original_functions = dict()
+        self.__original_functions = {}
 
     def hijack(self, attribute):
         if attribute not in self.__original_functions:
@@ -26,11 +26,10 @@ class ModuleHijacker:
 
     @staticmethod
     def install_or_get(module, hijacker_attribute, on_uninstall=lambda _callback: None):
-        if not hasattr(module, hijacker_attribute):
-            module_hijacker = ModuleHijacker(module)
-            setattr(module, hijacker_attribute, module_hijacker)
-            on_uninstall(lambda: delattr(module, hijacker_attribute))
-            on_uninstall(module_hijacker.reset_module)
-            return module_hijacker
-        else:
+        if hasattr(module, hijacker_attribute):
             return getattr(module, hijacker_attribute)
+        module_hijacker = ModuleHijacker(module)
+        setattr(module, hijacker_attribute, module_hijacker)
+        on_uninstall(lambda: delattr(module, hijacker_attribute))
+        on_uninstall(module_hijacker.reset_module)
+        return module_hijacker

@@ -45,9 +45,7 @@ def read_config():
 def to_json():
     if not global_state.config_histories:
         return ""
-    data = list()
-    for h in global_state.config_histories:
-        data.append(h.to_json())
+    data = [h.to_json() for h in global_state.config_histories]
     return json.dumps(data, indent=2)
 
 def save_history():
@@ -58,7 +56,7 @@ def save_history():
 def add_config(id: str, name: str, model: str, info_text: str, img) -> history.History:
     # init new history
     h = history.History(id, name, model, info_text)
-    
+
     # in case of not automatic save, we must store few items in case of manual saved
     if not global_state.automatic_save:
         global manual_save_history
@@ -67,22 +65,19 @@ def add_config(id: str, name: str, model: str, info_text: str, img) -> history.H
             "image": img,
         }
         return
-    
+
     # save image
     if global_state.save_thumbnail:
         new_width  = 300
         new_height = int(new_width * img.height / img.width)
         img = img.resize((new_width, new_height), Image.LANCZOS)
-        images.save_image_with_geninfo(img, None, os.path.join(global_state.history_path, f"{id}.jpg"))
-    else:
-        images.save_image_with_geninfo(img, None, os.path.join(global_state.history_path, f"{id}.jpg"))
-        
+    images.save_image_with_geninfo(img, None, os.path.join(global_state.history_path, f"{id}.jpg"))
     # add history to list
     global_state.config_histories.insert(0, h)
-    
+
     # save to file
     save_history()
-    
+
     # reload the UI
     global_state.config_changed = True
     return h
@@ -97,19 +92,16 @@ def manually_save():
             new_width  = 300
             new_height = int(new_width * img.height / img.width)
             img = img.resize((new_width, new_height), Image.LANCZOS)
-            images.save_image_with_geninfo(img, None, os.path.join(global_state.history_path, f"{h.id}.jpg"))
-        else:
-            images.save_image_with_geninfo(img, None, os.path.join(global_state.history_path, f"{h.id}.jpg"))
-            
+        images.save_image_with_geninfo(img, None, os.path.join(global_state.history_path, f"{h.id}.jpg"))
         # add history to list
         global_state.config_histories.insert(0, h)
-        
+
         # save to file
         save_history()
-        
+
         # reload the UI
         global_state.config_changed = True
-        
+
         # clean 
         manual_save_history = None
     
@@ -287,12 +279,23 @@ def history_table():
     global_state.is_enabled = shared.opts.data.get('prompt_history_enabled', True)
     global_state.automatic_save = shared.opts.data.get('prompt_history_automatic_save_info', True)
     global_state.save_thumbnail = shared.opts.data.get('prompt_history_save_thumbnail', True)
-    
-    active_class = "pmt_item_active"
-    
+
     if global_state.config_changed or not global_state.cached_data:
         
-        code = f"""
+        # calculate pagination
+        total_items = len(global_state.config_histories)
+        total_pages = math.floor(total_items / global_state.items_per_page)
+        if total_pages * global_state.items_per_page < total_items:
+            total_pages += 1
+        if current_page <= 0: current_page = 1
+        current_page = min(current_page, total_pages)
+        start_idx = (current_page - 1) * global_state.items_per_page
+        end_idx = start_idx + global_state.items_per_page
+        end_idx = min(end_idx, total_items)
+
+        active_class = "pmt_item_active"
+
+        code = """
         <div class="g-table-body">
         <table cellspacing="0" class="g-table-list">
             <thead>
@@ -304,27 +307,15 @@ def history_table():
             </thead>
             <tbody>
         """
-        
-        # calculate pagination
-        total_items = len(global_state.config_histories)
-        total_pages = math.floor(total_items / global_state.items_per_page)
-        if total_pages * global_state.items_per_page < total_items:
-            total_pages += 1
-        if current_page <= 0: current_page = 1
-        if current_page > total_pages: current_page = total_pages
-        start_idx = (current_page - 1) * global_state.items_per_page
-        end_idx = start_idx + global_state.items_per_page
-        if end_idx > total_items: end_idx = total_items
-        
         # render page
         for h in global_state.config_histories[start_idx:end_idx]:
             item_class = ""
             if h.id == active_id:
                 item_class = active_class
-            on_click_view_item_fn =  '"' + html.escape(f"""return promptHistoryItemClick('{h.id}')""") + '"'
-            on_click_delete_item_fn =  '"' + html.escape(f"""return promptHistoryItemDelete('{h.id}')""") + '"'
-            on_click_prev_fn =  '"' + html.escape(f"""return promptHistoryPrev()""") + '"'
-            on_click_next_fn =  '"' + html.escape(f"""return promptHistoryNext()""") + '"'
+            on_click_view_item_fn = f'''"{html.escape(f"""return promptHistoryItemClick('{h.id}')""")}"'''
+            on_click_delete_item_fn = f'''"{html.escape(f"""return promptHistoryItemDelete('{h.id}')""")}"'''
+            on_click_prev_fn = f'"{html.escape("""return promptHistoryPrev()""")}"'
+            on_click_next_fn = f'"{html.escape("""return promptHistoryNext()""")}"'
             code += f"""<tr class="{item_class}">
                         <td style="cursor: pointer;" onclick={on_click_view_item_fn} style="width: 90%;">{h.name} - {h.model}</td>
                         <td style="cursor: pointer;" onclick={on_click_view_item_fn}>{time.ctime(h.created_at)}</td>

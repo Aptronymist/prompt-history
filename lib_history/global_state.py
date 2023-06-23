@@ -10,7 +10,7 @@ items_per_page: int = 15
 
 # data
 history_path: str = ""
-config_histories: List[History] = list()
+config_histories: List[History] = []
 config_changed: bool = False
 cached_data: str = ""
 add_config: Callable
